@@ -6,29 +6,64 @@ using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Threading;
 using System.IO;
+using System.Net;
 
+namespace SimpleServer
+{
     class Program
     {
         private static TcpListener listener;
         private static List<ServerThread> threads;
         private static bool stopThread;
+        private static int port;
+        private static IPAddress ip;
+        public static bool log, loopHandle;
 
         static void Main(string[] args)
         {
-            listener = new TcpListener(4711);
+            //Starten///////////////////////////////////////////////////////////////////////////////////
+            ip = Dns.GetHostEntry(Dns.GetHostName()).AddressList.First(f => f.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+            Console.Write("Port: ");
+            port = int.Parse(Console.ReadLine());
+            Console.Clear();
+
+            listener = new TcpListener(ip, port);
             threads = new List<ServerThread>();
             listener.Start();
             Thread th = new Thread(new ThreadStart(Run));
             th.Start();
-//Hallo
+            Console.WriteLine("Server started and running at " + ip.ToString() + " on Port " + port.ToString());
+            Console.WriteLine("-------------------------------------------------------------------");
+
+            //Befehle handeln///////////////////////////////////////////////////////////////////////
             String cmd = "";
-            while (cmd.ToLower() != "stop")
+            loopHandle = true;
+            while (loopHandle)
             {
                 cmd = Console.ReadLine();
-                if (cmd.ToLower() != "stop")
-                    Console.WriteLine("Unbekannter Befehl!");
+                if (cmd.ToLower() == "stop")
+                {
+                    Console.Clear();
+                    loopHandle = false;
+                }
+                else if (cmd.ToLower() == "log")
+                {
+                    log = !log;
+                    if (log)
+                        Console.WriteLine("Logging on");
+                    else
+                        Console.WriteLine("Logging off");
+                }
+                else if (cmd.ToLower() == "cls")
+                {
+                    Console.Clear();
+                    Console.WriteLine("Server started and running at " + ip.ToString() + " on Port " + port.ToString());
+                    Console.WriteLine("-------------------------------------------------------------------");
+                }
             }
-            broadcast("Shutting down the Server!$", 0);
+
+            //Beenden//////////////////////////////////////////////////////////////////////////////////////
+            broadcast("Shutting down the Server!$");
             Console.WriteLine("Stopping main thread...");
             stopThread = true;
             Console.WriteLine("Main thread stopped!");
@@ -52,13 +87,17 @@ using System.IO;
             int counter = 0;
             while (!stopThread)
             {
-                TcpClient c = listener.AcceptTcpClient();
-                threads.Add(new ServerThread(c, counter));
+                try
+                {
+                    TcpClient c = listener.AcceptTcpClient();             
+                    threads.Add(new ServerThread(c, counter));
+                }
+                catch { }
                 counter++;
             }
         }
 
-        public static void broadcast(string Message, int index)
+        public static void broadcast(string Message)
         {
             for (int i = 0; i < threads.Count; i++)
             {
