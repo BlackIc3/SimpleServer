@@ -1,0 +1,70 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Net.Sockets;
+using System.Threading;
+using System.IO;
+
+namespace SimpleServer
+{
+    class Program
+    {
+        private static TcpListener listener;
+        private static List<ServerThread> threads;
+        private static bool stopThread;
+
+        static void Main(string[] args)
+        {
+            listener = new TcpListener(4711);
+            threads = new List<ServerThread>();
+            listener.Start();
+            Thread th = new Thread(new ThreadStart(Run));
+            th.Start();
+
+            String cmd = "";
+            while (cmd.ToLower() != "stop")
+            {
+                cmd = Console.ReadLine();
+                if (cmd.ToLower() != "stop")
+                    Console.WriteLine("Unbekannter Befehl!");
+            }
+            broadcast("Shutting down the Server!$", 0);
+            Console.WriteLine("Stopping main thread...");
+            stopThread = true;
+            Console.WriteLine("Main thread stopped!");
+            Console.WriteLine("Stopping running threads...");
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[i].stop = true;
+                while (threads[i].running)
+                    Thread.Sleep(1000);
+                Console.WriteLine("Thread " + (i + 1).ToString() + " stopped");
+            }
+            Console.WriteLine("All threads stopped!");
+            Console.WriteLine("Stopping TcpListener...");
+            listener.Stop();
+            Console.WriteLine("TcpListener stopped! \nAll services stopped! Program is safe to quit now!");
+            Console.ReadKey();
+        }
+
+        public static void Run()
+        {
+            int counter = 0;
+            while (!stopThread)
+            {
+                TcpClient c = listener.AcceptTcpClient();
+                threads.Add(new ServerThread(c, counter));
+                counter++;
+            }
+        }
+
+        public static void broadcast(string Message, int index)
+        {
+            for (int i = 0; i < threads.Count; i++)
+            {
+                threads[i].send(Message);
+            }
+        }
+    }
