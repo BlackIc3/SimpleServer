@@ -1,0 +1,58 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Net.Sockets;
+using System.Threading;
+using System.IO;
+
+class ServerThread
+    {
+        public bool stop = false;
+        public bool running = false;
+        private TcpClient connection;
+        public string userName;
+        private int threadNo;
+
+        public ServerThread(TcpClient c, int index)
+        {
+            threadNo = index;
+            connection = c;
+            new Thread(new ThreadStart(Run)).Start();
+        }
+
+        public void send(string msg)
+        {
+            Stream stream = connection.GetStream();
+            Byte[] sendBytes = Encoding.UTF8.GetBytes(msg);
+            stream.Write(sendBytes, 0, sendBytes.Length);
+        }
+
+        public void Run()
+        {
+            Byte[] bytesFrom = new Byte[65536];
+            string input;
+            Stream stream = connection.GetStream();
+            stream.Read(bytesFrom, 0, (int)connection.ReceiveBufferSize);
+            userName = Encoding.UTF8.GetString(bytesFrom);
+            userName = userName.Substring(0, userName.IndexOf('$'));
+            Console.WriteLine(userName + " joined");
+            Program.broadcast(userName + " joined$", threadNo);
+            bool loop = true;
+            while (loop)
+            {
+                try
+                {
+                    stream.Read(bytesFrom, 0, (int)connection.ReceiveBufferSize);
+                    input = Encoding.UTF8.GetString(bytesFrom);
+                    input = input.Substring(0, input.IndexOf('$'));
+                    Program.broadcast(userName + " >> " + input + "$", threadNo);
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine(ex.Message.ToString());
+                }
+            }
+        }
+    }
